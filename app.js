@@ -1075,7 +1075,7 @@ function renderRatingWordSpectrum(rows) {
         range: [0.5, 3.5],
         tickmode: "array",
         tickvals: [1, 2, 3],
-        ticktext: ["0-3", "4-6", "7-10"],
+        ticktext: ["0-4", "5-7", "8-10"],
         showgrid: true,
         gridcolor: "#e6ebf1"
       },
@@ -1101,9 +1101,9 @@ function renderRatingWordSpectrum(rows) {
 
 function buildRatingWordPoints(rows, ratingKey, textKey, isTop) {
   const bands = [
-    { label: "0-3", min: 0, max: 3, x: 1 },
-    { label: "4-6", min: 4, max: 6, x: 2 },
-    { label: "7-10", min: 7, max: 10, x: 3 }
+    { label: "0-4", min: 0, max: 4, x: 1 },
+    { label: "5-7", min: 5, max: 7, x: 2 },
+    { label: "8-10", min: 8, max: 10, x: 3 }
   ];
   const byBucket = new Map();
   for (const band of bands) byBucket.set(band.label, new Map());
@@ -1181,9 +1181,9 @@ function extractCommaNoteItems(text) {
 function ratingBand(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  if (n <= 3) return { label: "0-3", min: 0, max: 3, x: 1 };
-  if (n <= 6) return { label: "4-6", min: 4, max: 6, x: 2 };
-  return { label: "7-10", min: 7, max: 10, x: 3 };
+  if (n <= 4) return { label: "0-4", min: 0, max: 4, x: 1 };
+  if (n <= 7) return { label: "5-7", min: 5, max: 7, x: 2 };
+  return { label: "8-10", min: 8, max: 10, x: 3 };
 }
 
 function ratingColorFixed(value) {
