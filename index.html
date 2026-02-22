@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coffee Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
+    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.7/build/d3.layout.cloud.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>L&B Coffee Report</h1>
+    </header>
+
+    <main>
+      <h3 class="group-title">Rankings</h3>
+      <section class="card top-coffee-card">
+        <div class="section-header">
+          <h2>Top Coffees</h2>
+          <p>Ranked by average rating</p>
+        </div>
+        <div id="topCoffeeRankTable" class="table-scroll table-scroll-xl"></div>
+        <button id="toggleTopCoffeeRank" class="mini-btn" type="button">Show All</button>
+      </section>
+
+      <h3 class="group-title">Country Origin</h3>
+      <section class="card">
+        <div class="section-header">
+          <h2>Map of Coffees & Ratings</h2>
+          <p>Country-level average rating and tasting counts</p>
+        </div>
+        <div id="mapChart" class="plot"></div>
+        <div class="section-header">
+          <h2>Origin Deep Dive</h2>
+          <p>Click a country in the map or ranking table to see coffees</p>
+        </div>
+        <div id="originRegionDetails" class="table-scroll"></div>
+        <div class="section-header">
+          <h2>Top Origin Countries</h2>
+          <p>Ranked by average rating</p>
+        </div>
+        <div id="countryRankTable" class="table-scroll table-scroll-sm"></div>
+        <button id="toggleCountryRank" class="mini-btn" type="button">Show All</button>
+      </section>
+
+      <h3 class="group-title">Roaster Location</h3>
+      <section class="grid-2">
+        <section class="card">
+          <div class="section-header">
+            <h2>Roaster US State Map</h2>
+            <p>Average rating by US state from roaster location</p>
+          </div>
+          <div id="roasterMapChart" class="plot"></div>
+        </section>
+        <section class="card">
+          <div class="section-header">
+            <h2>Roaster Country Map</h2>
+            <p>Average rating by roaster country</p>
+          </div>
+          <div id="roasterCountryMapChart" class="plot"></div>
+        </section>
+      </section>
+      <section class="card">
+        <div class="section-header">
+          <h2>Roaster Region Drilldown</h2>
+          <p>Click a state or country above to see coffees from that region</p>
+        </div>
+        <div id="roasterRegionDetails" class="table-scroll"></div>
+        <div class="section-header">
+          <h2>Top Roaster Locations</h2>
+          <p>US states for US roasters, countries otherwise</p>
+        </div>
+        <div id="roasterRankTable" class="table-scroll table-scroll-sm"></div>
+        <button id="toggleRoasterRank" class="mini-btn" type="button">Show All</button>
+      </section>
+
+      <h3 class="group-title">By Varietal & Process</h3>
+      <section class="grid-2">
+        <section class="card">
+          <div class="section-header">
+            <h2>Varietal Analysis</h2>
+            <p>Standardized common varietals, ranked by average rating</p>
+          </div>
+          <div id="varietalChart" class="plot"></div>
+        </section>
+        <section class="card">
+          <div class="section-header">
+            <h2>Process Analysis</h2>
+            <p>Standardized processing methods by average rating</p>
+          </div>
+          <div id="processChart" class="plot"></div>
+        </section>
+      </section>
+
+      <h3 class="group-title">By Year</h3>
+      <section class="grid-2">
+        <section class="card">
+          <div class="section-header">
+            <h2>Coffees Tasted by Year</h2>
+          </div>
+          <div id="tastedChart" class="plot"></div>
+        </section>
+        <section class="card">
+          <div class="section-header">
+            <h2>Average Rating by Year</h2>
+          </div>
+          <div id="ratingsChart" class="plot"></div>
+        </section>
+      </section>
+
+      <h3 class="group-title">Alex & Rebecca</h3>
+      <section class="grid-2">
+        <section class="card">
+          <div class="section-header">
+            <h2>Alex vs Rebecca by Country</h2>
+            <p>Average ratings for countries with enough paired tastings</p>
+          </div>
+          <div id="tasterCountryChart" class="plot"></div>
+        </section>
+        <section class="card">
+          <div class="section-header">
+            <h2>Alex vs Rebecca by Year</h2>
+            <p>Average ratings where both rated the same tasting</p>
+          </div>
+          <div id="tasterYearChart" class="plot"></div>
+        </section>
+      </section>
+      <section class="card">
+        <div class="section-header">
+          <h2>Alex vs Rebecca by Process</h2>
+          <p>Average ratings for processes with enough paired tastings</p>
+        </div>
+        <div id="tasterProcessChart" class="plot"></div>
+      </section>
+
+      <section class="grid-2">
+        <section class="card">
+          <div class="section-header">
+            <h2>Alex Ranking</h2>
+            <p>Coffees ranked by Alex rating</p>
+          </div>
+          <div id="alexTop5Table" class="table-scroll"></div>
+        </section>
+        <section class="card">
+          <div class="section-header">
+            <h2>Rebecca Ranking</h2>
+            <p>Coffees ranked by Rebecca rating</p>
+          </div>
+          <div id="rebTop5Table" class="table-scroll"></div>
+        </section>
+      </section>
+
+      <section class="grid-2">
+        <section class="card">
+          <div class="section-header">
+            <h2>Alex Word Cloud</h2>
+          </div>
+          <div id="alexCloud" class="cloud"></div>
+        </section>
+        <section class="card">
+          <div class="section-header">
+            <h2>Rebecca Word Cloud</h2>
+          </div>
+          <div id="rebCloud" class="cloud"></div>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      <small id="sourceNote"></small>
+    </footer>
+  </body>
+</html>
