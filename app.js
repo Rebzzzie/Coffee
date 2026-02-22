@@ -274,7 +274,7 @@ function renderTopCoffeeRank(rows) {
 
   const tableHtml = [
     "<table>",
-    "<thead><tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Coffee Origin</th><th>Process</th><th>Overall Ranking</th></tr></thead>",
+    "<thead><tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Coffee Origin</th><th>Process</th><th>Overall Rating</th></tr></thead>",
     "<tbody>",
     ...shown.map((r) =>
       `<tr><td style="color:${ratingColor(r.avg)};">${escapeHtml(r.roaster)}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(
