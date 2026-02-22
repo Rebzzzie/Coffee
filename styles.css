@@ -121,14 +121,22 @@ main {
 }
 
 .top-coffee-card {
-  background: #e2e6eb;
-  border-color: #c2c9d2;
+  background: #2f4f73;
+  border-color: #274564;
   border-width: 2px;
 }
 
 .top-coffee-card .table-scroll {
   background: #ffffff;
   border-color: #c2c9d2;
+}
+
+.top-coffee-card .section-header h2 {
+  color: #ecf4ff;
+}
+
+.top-coffee-card .section-header p {
+  color: #cfe0f4;
 }
 
 .mini-btn {
@@ -173,6 +181,46 @@ main {
   border-bottom: 1px solid var(--border);
   text-align: left;
   font-size: 0.92rem;
+}
+
+.avg-rating-cell {
+  background: #f1f3f5;
+  box-shadow: inset 0 0 0 1px #dde2e7;
+}
+
+.table-scroll td.avg-rating-cell,
+.table-wrap td.avg-rating-cell {
+  text-align: center;
+}
+
+#topCoffeeRankTable th:last-child,
+#topCoffeeRankTable td:last-child {
+  text-align: center !important;
+}
+
+#topCoffeeRankTable tbody td:nth-child(1),
+#topCoffeeRankTable tbody td:nth-child(2) {
+  font-weight: 700;
+}
+
+#topCoffeeRankTable th:not(:last-child),
+#topCoffeeRankTable td:not(:last-child) {
+  border-right: 1px solid #e7edf4;
+}
+
+#topCoffeeRankTable thead th {
+  background: #eef3f9;
+  color: #3f4f61;
+  font-weight: 700;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 2px solid #d6e1ee;
+}
+
+.rating-value {
+  display: inline-block;
+  min-width: 3ch;
+  text-align: center;
 }
 
 .analysis-grid {

@@ -257,50 +257,34 @@ function toRecord(row) {
 }
 
 function renderTopCoffeeRank(rows) {
-  const grouped = new Map();
-  for (const row of rows) {
-    if (row.avgRating === null) continue;
-    const key = [
-      normalizeGroupValue(row.roaster),
-      normalizeGroupValue(row.roasterLocation),
-      normalizeGroupValue(row.coffeeName),
-      normalizeGroupValue(row.country)
-    ].join("|");
-
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        roaster: row.roaster || "Unknown Roaster",
-        roasterLocation: row.roasterLocation || "Unknown Location",
-        coffeeName: row.coffeeName || "(Unnamed Coffee)",
-        country: row.country || "Unknown Origin",
-        hasDecaf: false,
-        sum: 0,
-        count: 0
-      });
-    }
-    const g = grouped.get(key);
-    g.sum += row.avgRating;
-    g.count += 1;
-    g.hasDecaf = g.hasDecaf || Boolean(row.isDecaf);
-  }
-
-  const ranked = [...grouped.entries()]
-    .map(([, v]) => ({
-      roaster: toDisplayCase(v.roaster),
-      roasterLocation: toDisplayCase(v.roasterLocation),
-      coffeeName: coffeeNameWithDecaf(v.coffeeName, v.hasDecaf),
-      country: toDisplayCase(v.country),
-      avg: v.sum / v.count
+  const ranked = rows
+    .filter((r) => r.avgRating !== null)
+    .map((r) => ({
+      roaster: toDisplayCase(r.roaster || "Unknown Roaster"),
+      roasterLocation: toDisplayCase(r.roasterLocation || "Unknown Location"),
+      coffeeName: coffeeNameWithDecaf(r.coffeeName || "(Unnamed Coffee)", r.isDecaf),
+      country: toDisplayCase(r.country || "Unknown Origin"),
+      process: r.process || "",
+      avg: r.avgRating,
+      alex: r.alexRating,
+      reb: r.rebRating
     }))
     .sort((a, b) => b.avg - a.avg);
   const shown = RANK_EXPANDED.topCoffee ? ranked : ranked.slice(0, 10);
 
   const tableHtml = [
     "<table>",
-    "<thead><tr><th>Roaster</th><th>Roaster Location</th><th>Name</th><th>Origin</th><th>Avg Rating</th></tr></thead>",
+    "<thead><tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Coffee Origin</th><th>Process</th><th>Overall Ranking</th></tr></thead>",
     "<tbody>",
     ...shown.map((r) =>
-      `<tr><td>${escapeHtml(r.roaster)}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(r.coffeeName)}</td><td>${escapeHtml(r.country)}</td><td>${formatRatingHtml(r.avg, 2)}</td></tr>`
+      `<tr><td style="color:${ratingColor(r.avg)};">${escapeHtml(r.roaster)}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(
+        r.coffeeName
+      )}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(
+        r.country
+      )}</td><td>${escapeHtml(r.process)}</td><td class="avg-rating-cell">${formatRatingHtml(
+        r.avg,
+        2
+      )}</td></tr>`
     ),
     "</tbody></table>"
   ].join("");
@@ -1382,7 +1366,7 @@ function escapeHtml(value) {
 function formatRatingHtml(value, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(value)) return "";
   const text = Number(value).toFixed(digits);
-  return `<span style="color:${ratingColor(value)};font-weight:600;">${text}</span>`;
+  return `<span class="rating-value" style="color:${ratingColor(value)};font-weight:600;">${text}</span>`;
 }
 
 function ratingColor(value) {
