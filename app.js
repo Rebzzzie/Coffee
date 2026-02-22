@@ -302,10 +302,10 @@ function renderTopCoffeeRank(rows) {
 
   const tableHtml = [
     "<table>",
-    "<thead><tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Coffee Origin</th><th>Process</th><th>Overall Rating</th></tr></thead>",
+    "<thead><tr><th class=\"rank-col\">#</th><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Coffee Origin</th><th>Process</th><th>Overall Rating</th></tr></thead>",
     "<tbody>",
-    ...shown.map((r) =>
-      `<tr><td style="color:${ratingColor(r.avg)};">${escapeHtml(r.roaster)}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(
+    ...shown.map((r, idx) =>
+      `<tr><td class="rank-col">${idx + 1}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(r.roaster)}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(
         r.coffeeName
       )}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(
         r.country
@@ -325,49 +325,22 @@ function renderTasterTop5(rows, who) {
   const isAlex = who === "alex";
   const targetId = isAlex ? "alexTop5Table" : "rebTop5Table";
   const ratingKey = isAlex ? "alexRating" : "rebRating";
-  const grouped = new Map();
-
-  for (const row of rows) {
-    const rating = row[ratingKey];
-    if (rating === null) continue;
-    const key = [
-      normalizeGroupValue(row.roaster),
-      normalizeGroupValue(row.roasterLocation),
-      normalizeGroupValue(row.coffeeName),
-      normalizeGroupValue(row.country)
-    ].join("|");
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        coffeeName: row.coffeeName || "(Unnamed Coffee)",
-        roaster: row.roaster || "Unknown Roaster",
-        roasterLocation: row.roasterLocation || "Unknown Location",
-        country: row.country || "Unknown Origin",
-        hasDecaf: false,
-        sum: 0,
-        count: 0
-      });
-    }
-    const g = grouped.get(key);
-    g.sum += rating;
-    g.count += 1;
-    g.hasDecaf = g.hasDecaf || Boolean(row.isDecaf);
-  }
-
-  const top5 = [...grouped.values()]
-    .map((v) => ({
-      coffeeName: coffeeNameWithDecaf(v.coffeeName, v.hasDecaf),
-      roaster: toDisplayCase(v.roaster),
-      roasterLocation: toDisplayCase(v.roasterLocation),
-      country: v.country,
-      avg: v.sum / v.count
+  const rankedRows = rows
+    .filter((row) => row[ratingKey] !== null)
+    .map((row) => ({
+      coffeeName: coffeeNameWithDecaf(row.coffeeName || "(Unnamed Coffee)", row.isDecaf),
+      roaster: toDisplayCase(row.roaster || "Unknown Roaster"),
+      roasterLocation: toDisplayCase(row.roasterLocation || "Unknown Location"),
+      country: row.country || "Unknown Origin",
+      rating: row[ratingKey]
     }))
-    .sort((a, b) => b.avg - a.avg);
+    .sort((a, b) => b.rating - a.rating);
 
   const html = [
     "<table>",
     "<thead><tr><th>Name</th><th>Roaster</th><th>Roaster Location</th><th>Origin</th><th>Rating</th></tr></thead>",
     "<tbody>",
-    ...top5.map((r) => `<tr><td>${escapeHtml(r.coffeeName)}</td><td>${escapeHtml(r.roaster)}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(r.country)}</td><td>${formatRatingHtml(r.avg, 2)}</td></tr>`),
+    ...rankedRows.map((r) => `<tr><td>${escapeHtml(r.coffeeName)}</td><td>${escapeHtml(r.roaster)}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(r.country)}</td><td>${formatRatingHtml(r.rating, 2)}</td></tr>`),
     "</tbody></table>"
   ].join("");
 
@@ -943,10 +916,11 @@ function renderVarietalChart(rows) {
       margin: { t: 10, r: 10, b: 55, l: 45 },
       xaxis: { title: "Varietal", tickangle: -20 },
       yaxis: { title: "Avg Rating", range: [min, max] },
+      dragmode: false,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)"
     },
-    { responsive: true }
+    { responsive: true, displayModeBar: false, scrollZoom: false }
   );
 }
 
@@ -993,10 +967,11 @@ function renderProcessChart(rows) {
       margin: { t: 10, r: 10, b: 55, l: 45 },
       xaxis: { title: "Process", tickangle: -20 },
       yaxis: { title: "Avg Rating", range: [min, max] },
+      dragmode: false,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)"
     },
-    { responsive: true }
+    { responsive: true, displayModeBar: false, scrollZoom: false }
   );
 }
 
@@ -1272,10 +1247,11 @@ function renderTastedChart(rows) {
       margin: { t: 10, r: 10, b: 45, l: 45 },
       xaxis: { title: "Year", type: "category" },
       yaxis: { title: "Coffees Tasted" },
+      dragmode: false,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)"
     },
-    { responsive: true }
+    { responsive: true, displayModeBar: false, scrollZoom: false }
   );
 }
 
@@ -1430,7 +1406,6 @@ function canonicalProcess(value) {
 function renderAlexRebeccaDiff(rows) {
   const paired = rows.filter((r) => r.alexRating !== null && r.rebRating !== null);
   renderTasterCountryCompare(paired);
-  renderTasterYearCompare(paired);
   renderTasterProcessCompare(paired);
 }
 
@@ -1525,10 +1500,11 @@ function renderPairedBarChart(elementId, rows, xTitle, yTitle) {
       xaxis: { title: xTitle, tickangle: -20 },
       yaxis: { title: yTitle, range: [min, max] },
       legend: { orientation: "h" },
+      dragmode: false,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)"
     },
-    { responsive: true }
+    { responsive: true, displayModeBar: false, scrollZoom: false }
   );
 }
 

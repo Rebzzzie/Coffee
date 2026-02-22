@@ -198,8 +198,14 @@ main {
   text-align: center !important;
 }
 
-#topCoffeeRankTable tbody td:nth-child(1),
-#topCoffeeRankTable tbody td:nth-child(2) {
+#topCoffeeRankTable .rank-col {
+  width: 2.8rem;
+  text-align: center !important;
+  color: #6b7683;
+}
+
+#topCoffeeRankTable tbody td:nth-child(2),
+#topCoffeeRankTable tbody td:nth-child(3) {
   font-weight: 700;
 }
 
