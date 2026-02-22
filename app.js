@@ -10,14 +10,19 @@ const MIN_PAIRED_PROCESS_COUNT = 2;
 const COLOR_ORANGE = "#e9a441";
 const COLOR_GREEN = "#79b987";
 const RATING_COLORSCALE = [
-  [0, "#b2182b"],
-  [0.2, "#d6604d"],
-  [0.4, "#f4a582"],
-  [0.6, "#92c5de"],
-  [0.8, "#4393c3"],
-  [1, "#2166ac"]
+  // Spectrum: red -> orange -> yellow -> green, then blue at the very top
+  [0.0, "#c81e34"],
+  [0.4, "#f07f2f"],
+  [0.62, "#f4d03f"],
+  [0.72, "#9bcf4a"],
+  [0.8, "#2fb34f"],
+  [0.9, "#3f8bd6"],
+  [1.0, "#1f5fbf"]
 ];
 const RATING_COLOR_STOPS = RATING_COLORSCALE.map(([stop, hex]) => ({ stop, rgb: hexToRgb(hex) }));
+const RATING_SCALE_MIN = 0;
+const RATING_SCALE_MAX = 10;
+const RATING_SCALE_MID = 6.5;
 let ORIGIN_MAP_SCALE = null;
 let CURRENT_ROWS_ALL = [];
 let CURRENT_ROWS_ANALYSIS = [];
@@ -453,12 +458,6 @@ function renderMap(rows) {
     document.getElementById("mapChart").innerHTML = "<p>No country-level rating data available.</p>";
     return;
   }
-  const scale = ORIGIN_MAP_SCALE || computeOriginMapScale(rows);
-  const colorMin = scale.min;
-  const colorMax = scale.max;
-  const colorMid = (colorMin + colorMax) / 2;
-  ORIGIN_MAP_SCALE = { min: colorMin, max: colorMax, mid: colorMid };
-
   Plotly.newPlot(
     "mapChart",
     [
@@ -476,12 +475,12 @@ function renderMap(rows) {
           size: counts.map((n) => 10 + n * 2.2),
           color: avg,
           colorscale: RATING_COLORSCALE,
-          cmin: colorMin,
-          cmax: colorMax,
-          cmid: colorMid,
+          cmin: RATING_SCALE_MIN,
+          cmax: RATING_SCALE_MAX,
+          cmid: RATING_SCALE_MID,
           colorbar: {
             title: "Avg Rating",
-            tickformat: ".2f"
+            tickformat: ".1f"
           },
           line: { color: "#5c4a35", width: 0.7 }
         }
@@ -543,10 +542,6 @@ function renderRoasterStateMap(grouped) {
     target.innerHTML = "<p>No US roaster-location data available.</p>";
     return;
   }
-  const scale = ORIGIN_MAP_SCALE || tightRange(avg, 0.15, 0, 10);
-  const min = scale.min;
-  const max = scale.max;
-
   Plotly.newPlot(
     "roasterMapChart",
     [
@@ -555,11 +550,14 @@ function renderRoasterStateMap(grouped) {
         locationmode: "USA-states",
         locations: states,
         z: avg,
-        zmin: min,
-        zmax: max,
+        zmin: RATING_SCALE_MIN,
+        zmax: RATING_SCALE_MAX,
         colorscale: RATING_COLORSCALE,
         marker: { line: { color: "#ffffff", width: 1 } },
-        colorbar: { title: "Avg Rating", tickformat: ".2f" },
+        colorbar: {
+          title: "Avg Rating",
+          tickformat: ".1f"
+        },
         text: states.map((s, i) => `${s}<br>Avg Rating: ${avg[i].toFixed(2)}<br>Tastings: ${counts[i]}`),
         hovertemplate: "%{text}<extra></extra>"
       }
@@ -630,9 +628,8 @@ function renderRoasterCountryMap(grouped) {
     target.innerHTML = "<p>No roaster-country data available.</p>";
     return;
   }
-  const scale = ORIGIN_MAP_SCALE || tightRange(avg, 0.15, 0, 10);
-  const min = scale.min;
-  const max = scale.max;
+  const min = RATING_SCALE_MIN;
+  const max = RATING_SCALE_MAX;
 
   const baseTrace = {
     type: "scattergeo",
@@ -644,9 +641,9 @@ function renderRoasterCountryMap(grouped) {
       size: counts.map((n) => 10 + n * 2.2),
       color: avg,
       colorscale: RATING_COLORSCALE,
-      cmin: min,
-      cmax: max,
-      cmid: (min + max) / 2,
+      cmin: RATING_SCALE_MIN,
+      cmax: RATING_SCALE_MAX,
+      cmid: RATING_SCALE_MID,
       line: { color: "#5c4a35", width: 0.7 }
     },
     text: countries.map((c, i) => `${c}<br>Avg Rating: ${avg[i].toFixed(2)}<br>Tastings: ${counts[i]}`),
@@ -673,9 +670,9 @@ function renderRoasterCountryMap(grouped) {
           size: smallCountries.map((x) => 14 + x.count * 2.5),
           color: smallCountries.map((x) => x.avg),
           colorscale: RATING_COLORSCALE,
-          cmin: min,
-          cmax: max,
-          cmid: (min + max) / 2,
+          cmin: RATING_SCALE_MIN,
+          cmax: RATING_SCALE_MAX,
+          cmid: RATING_SCALE_MID,
           line: { color: "#5c4a35", width: 0.7 },
           symbol: "circle"
         },
@@ -997,9 +994,9 @@ function renderVarietalChart(rows) {
         hovertemplate: "%{x}<br>Avg Rating: %{y:.2f}<br>Count: %{text}<extra></extra>",
         marker: {
           color: y,
-          cmin: min,
-          cmax: max,
-          cmid: (min + max) / 2,
+          cmin: RATING_SCALE_MIN,
+          cmax: RATING_SCALE_MAX,
+          cmid: RATING_SCALE_MID,
           colorscale: RATING_COLORSCALE
         }
       }
@@ -1048,9 +1045,9 @@ function renderProcessChart(rows) {
         hovertemplate: "%{x}<br>Avg Rating: %{y:.2f}<br>Count: %{text}<extra></extra>",
         marker: {
           color: y,
-          cmin: min,
-          cmax: max,
-          cmid: (min + max) / 2,
+          cmin: RATING_SCALE_MIN,
+          cmax: RATING_SCALE_MAX,
+          cmid: RATING_SCALE_MID,
           colorscale: RATING_COLORSCALE
         }
       }
@@ -1383,9 +1380,9 @@ function renderRatingsChart(rows) {
         marker: {
           size: 11,
           color: yAvg,
-          cmin: yMin,
-          cmax: yMax,
-          cmid: (yMin + yMax) / 2,
+          cmin: RATING_SCALE_MIN,
+          cmax: RATING_SCALE_MAX,
+          cmid: RATING_SCALE_MID,
           colorscale: RATING_COLORSCALE,
           line: { color: "#ffffff", width: 1 }
         }
@@ -1669,9 +1666,8 @@ function formatRatingHtml(value, digits = 2) {
 }
 
 function ratingColor(value) {
-  const scale = ORIGIN_MAP_SCALE || { min: 0, max: 10 };
-  const min = scale.min;
-  const max = scale.max;
+  const min = RATING_SCALE_MIN;
+  const max = RATING_SCALE_MAX;
   const range = max - min || 1;
   const t = Math.max(0, Math.min(1, (Number(value) - min) / range));
   if (t <= RATING_COLOR_STOPS[0].stop) return rgbToHex(RATING_COLOR_STOPS[0].rgb);
