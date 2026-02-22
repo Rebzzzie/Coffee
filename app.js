@@ -108,6 +108,7 @@ async function init() {
   renderTasterTop5(rows, "reb");
   renderWordCloud(rows, "alex", "alexCloud", COLOR_ORANGE);
   renderWordCloud(rows, "reb", "rebCloud", COLOR_GREEN);
+  renderRatingWordSpectrum(rows);
   renderTastedChart(rows);
   renderRatingsChart(rows);
   renderAlexRebeccaDiff(rows);
@@ -190,6 +191,26 @@ function findValue(row, candidates) {
   return "";
 }
 
+function findTastingNotesValue(row, candidates) {
+  const keys = Object.keys(row);
+  const blocked = /(opinion|opinions|rating|score|rank|review|comment|comments|overall)/i;
+  const normalized = keys.map((k) => ({ key: k, nk: normalizeKey(k), value: row[k] }));
+
+  for (const candidate of candidates) {
+    const cn = normalizeKey(candidate);
+    const exact = normalized.find((item) => item.nk === cn && !blocked.test(item.key));
+    if (exact && exact.value !== undefined && exact.value !== "") return exact.value;
+  }
+
+  for (const candidate of candidates) {
+    const cn = normalizeKey(candidate);
+    const partial = normalized.find((item) => item.nk.includes(cn) && !blocked.test(item.key));
+    if (partial && partial.value !== undefined && partial.value !== "") return partial.value;
+  }
+
+  return "";
+}
+
 function normalizeKey(key) {
   return key.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -251,8 +272,15 @@ function toRecord(row) {
     alexRating,
     rebRating,
     avgRating,
-    alexText: `${findValue(row, ["Alex Tasting Notes", "Alex Tasting"])} `.trim(),
-    rebText: `${findValue(row, ["Rebby Tasting", "Rebecca Tasting", "Reb Tasting"])} `.trim()
+    alexText: `${findTastingNotesValue(row, ["Alex Tasting Notes", "Alex Tasting"])} `.trim(),
+    rebText: `${findTastingNotesValue(row, [
+      "Rebby Tasting Notes",
+      "Rebecca Tasting Notes",
+      "Reb Tasting Notes",
+      "Rebby Tasting",
+      "Rebecca Tasting",
+      "Reb Tasting"
+    ])} `.trim()
   };
 }
 
@@ -1011,6 +1039,204 @@ function drawCloud(words, container, width, height, color) {
     .attr("text-anchor", "middle")
     .attr("transform", (d) => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
     .text((d) => d.text);
+}
+
+function renderRatingWordSpectrum(rows) {
+  const target = document.getElementById("ratingWordSpectrumChart");
+  if (!target) return;
+
+  const alexPoints = buildRatingWordPoints(rows, "alexRating", "alexText", true);
+  const rebPoints = buildRatingWordPoints(rows, "rebRating", "rebText", false);
+
+  if (!alexPoints.length && !rebPoints.length) {
+    target.innerHTML = "<p>Not enough tasting-note words tied to ratings yet.</p>";
+    return;
+  }
+
+  const traces = [];
+  if (alexPoints.length) {
+    traces.push({
+      type: "scatter",
+      mode: "text",
+      name: "Alex",
+      showlegend: false,
+      x: alexPoints.map((p) => p.x),
+      y: alexPoints.map((p) => p.y),
+      text: alexPoints.map((p) => p.label),
+      textfont: {
+        size: alexPoints.map((p) => p.size),
+        color: alexPoints.map((p) => p.color)
+      },
+      customdata: alexPoints.map((p) => [p.bucket, p.count, p.word]),
+      hovertemplate: "Alex: %{customdata[2]}<br>Rating bucket: %{customdata[0]}<br>Count: %{customdata[1]}<extra></extra>"
+    });
+  }
+
+  if (rebPoints.length) {
+    traces.push({
+      type: "scatter",
+      mode: "text",
+      name: "Rebecca",
+      showlegend: false,
+      x: rebPoints.map((p) => p.x),
+      y: rebPoints.map((p) => p.y),
+      text: rebPoints.map((p) => p.label),
+      textfont: {
+        size: rebPoints.map((p) => p.size),
+        color: rebPoints.map((p) => p.color)
+      },
+      customdata: rebPoints.map((p) => [p.bucket, p.count, p.word]),
+      hovertemplate: "Rebecca: %{customdata[2]}<br>Rating bucket: %{customdata[0]}<br>Count: %{customdata[1]}<extra></extra>"
+    });
+  }
+
+  Plotly.newPlot(
+    "ratingWordSpectrumChart",
+    traces,
+    {
+      margin: { t: 10, r: 20, b: 45, l: 20 },
+      xaxis: {
+        title: "Rating Band",
+        range: [0.5, 3.5],
+        tickmode: "array",
+        tickvals: [1, 2, 3],
+        ticktext: ["0-3", "4-6", "7-10"],
+        showgrid: true,
+        gridcolor: "#e6ebf1"
+      },
+      yaxis: {
+        range: [-2.25, 2.25],
+        showticklabels: false,
+        showgrid: false,
+        zeroline: true,
+        zerolinecolor: "#c8d3e0",
+        zerolinewidth: 2
+      },
+      annotations: [
+        { x: 2.05, y: 1.95, text: "Alex", showarrow: false, font: { color: COLOR_ORANGE, size: 12 } },
+        { x: 2.05, y: -1.95, text: "Rebecca", showarrow: false, font: { color: COLOR_GREEN, size: 12 } }
+      ],
+      showlegend: false,
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)"
+    },
+    { responsive: true }
+  );
+}
+
+function buildRatingWordPoints(rows, ratingKey, textKey, isTop) {
+  const bands = [
+    { label: "0-3", min: 0, max: 3, x: 1 },
+    { label: "4-6", min: 4, max: 6, x: 2 },
+    { label: "7-10", min: 7, max: 10, x: 3 }
+  ];
+  const byBucket = new Map();
+  for (const band of bands) byBucket.set(band.label, new Map());
+
+  for (const row of rows) {
+    const rating = row[ratingKey];
+    if (rating === null || rating === undefined || Number.isNaN(rating)) continue;
+    const band = ratingBand(rating);
+    if (!band) continue;
+    const terms = extractCommaNoteItems(row[textKey] || "");
+    if (!terms.length) continue;
+    const map = byBucket.get(band.label);
+    for (const term of terms) {
+      map.set(term, (map.get(term) || 0) + 1);
+    }
+  }
+
+  const points = [];
+  for (const band of bands) {
+    const entries = [...byBucket.get(band.label).entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+    if (!entries.length) continue;
+
+    const yBase = isTop ? 0.55 : -0.55;
+    const direction = isTop ? 1 : -1;
+    const color = ratingColorFixed((band.min + band.max) / 2);
+    const xOffsets = [-0.32, -0.1, 0.12, 0.34];
+    entries.forEach(([word, count], idx) => {
+      points.push({
+        x: band.x + (xOffsets[idx] || 0),
+        y: yBase + direction * idx * 0.34,
+        word,
+        label: trimWordLabel(word, 22),
+        count,
+        bucket: band.label,
+        color,
+        size: 10 + Math.min(12, count * 1.4)
+      });
+    });
+  }
+  return points;
+}
+
+function tokenizeNotes(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+}
+
+function extractCommaNoteItems(text) {
+  const raw = String(text || "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ");
+  const segments = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!segments.length) return [];
+
+  const items = [];
+  for (const segment of segments) {
+    const cleaned = segment
+      .replace(/[^a-z0-9\s/-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned || cleaned.length < 3) continue;
+    items.push(cleaned);
+  }
+  return items;
+}
+
+function ratingBand(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 3) return { label: "0-3", min: 0, max: 3, x: 1 };
+  if (n <= 6) return { label: "4-6", min: 4, max: 6, x: 2 };
+  return { label: "7-10", min: 7, max: 10, x: 3 };
+}
+
+function ratingColorFixed(value) {
+  const min = 2;
+  const max = 10;
+  const range = max - min || 1;
+  const t = Math.max(0, Math.min(1, (Number(value) - min) / range));
+  if (t <= RATING_COLOR_STOPS[0].stop) return rgbToHex(RATING_COLOR_STOPS[0].rgb);
+  for (let i = 1; i < RATING_COLOR_STOPS.length; i++) {
+    const a = RATING_COLOR_STOPS[i - 1];
+    const b = RATING_COLOR_STOPS[i];
+    if (t <= b.stop) {
+      const local = (t - a.stop) / (b.stop - a.stop || 1);
+      const rgb = {
+        r: Math.round(a.rgb.r + (b.rgb.r - a.rgb.r) * local),
+        g: Math.round(a.rgb.g + (b.rgb.g - a.rgb.g) * local),
+        b: Math.round(a.rgb.b + (b.rgb.b - a.rgb.b) * local)
+      };
+      return rgbToHex(rgb);
+    }
+  }
+  return rgbToHex(RATING_COLOR_STOPS[RATING_COLOR_STOPS.length - 1].rgb);
+}
+
+function trimWordLabel(word, maxLen = 16) {
+  const text = String(word || "");
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen - 1)}…`;
 }
 
 function wordFrequency(text) {
