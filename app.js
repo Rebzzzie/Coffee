@@ -19,7 +19,8 @@ const RATING_COLORSCALE = [
 ];
 const RATING_COLOR_STOPS = RATING_COLORSCALE.map(([stop, hex]) => ({ stop, rgb: hexToRgb(hex) }));
 let ORIGIN_MAP_SCALE = null;
-let CURRENT_ROWS = [];
+let CURRENT_ROWS_ALL = [];
+let CURRENT_ROWS_ANALYSIS = [];
 const RANK_EXPANDED = {
   topCoffee: false,
   country: false,
@@ -77,6 +78,7 @@ const STOPWORDS = new Set([
 window.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  initCollapsibleSections();
   const sourceNote = document.getElementById("sourceNote");
   let rawRows = [];
 
@@ -92,27 +94,67 @@ async function init() {
     if (sourceNote) sourceNote.textContent = "Google Sheet loaded, but no usable rows were found. Check column headers and gid.";
     return;
   }
-  ORIGIN_MAP_SCALE = computeOriginMapScale(rows);
-  CURRENT_ROWS = rows;
+  const analysisRows = rows.filter((r) => !r.isDecaf);
+  CURRENT_ROWS_ALL = rows;
+  CURRENT_ROWS_ANALYSIS = analysisRows;
+  if (!analysisRows.length) {
+    if (sourceNote) sourceNote.textContent = "No non-decaf coffees found for main analysis.";
+    initRankingControls();
+    renderTopCoffeeRank(rows);
+    renderDecafRank(rows);
+    return;
+  }
+
+  ORIGIN_MAP_SCALE = computeOriginMapScale(analysisRows);
   initRankingControls();
 
   renderTopCoffeeRank(rows);
-  renderMap(rows);
-  renderRoasterLocationSection(rows);
-  renderCountryRankTable(rows);
-  renderRoasterRankTable(rows);
+  renderDecafRank(rows);
+  renderMap(analysisRows);
+  renderRoasterLocationSection(analysisRows);
+  renderCountryRankTable(analysisRows);
+  renderRoasterRankTable(analysisRows);
   renderOriginRegionDetails([], "Select an origin country from the map or ranking table");
-  renderVarietalChart(rows);
-  renderProcessChart(rows);
-  renderTasterTop5(rows, "alex");
-  renderTasterTop5(rows, "reb");
-  renderWordCloud(rows, "alex", "alexCloud", COLOR_ORANGE);
-  renderWordCloud(rows, "reb", "rebCloud", COLOR_GREEN);
-  renderRatingWordSpectrum(rows);
-  renderTastedChart(rows);
-  renderRatingsChart(rows);
-  renderAlexRebeccaDiff(rows);
+  renderVarietalChart(analysisRows);
+  renderProcessChart(analysisRows);
+  renderTasterTop5(analysisRows, "alex");
+  renderTasterTop5(analysisRows, "reb");
+  renderRatingWordSpectrum(analysisRows);
+  renderTastedChart(analysisRows);
+  renderRatingsChart(analysisRows);
+  renderAlexRebeccaDiff(analysisRows);
   if (sourceNote) sourceNote.textContent = "";
+}
+
+function initCollapsibleSections() {
+  const sections = document.querySelectorAll("[data-collapsible]");
+  sections.forEach((section) => {
+    section.classList.remove("open");
+    const button = section.querySelector(".collapsible-toggle");
+    if (!button) return;
+    button.setAttribute("aria-expanded", "false");
+    button.onclick = () => {
+      const isOpen = section.classList.toggle("open");
+      button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      if (isOpen) {
+        // Plots rendered while hidden can have incorrect dimensions; force relayout on open.
+        resizeSectionPlots(section);
+      }
+    };
+  });
+}
+
+function resizeSectionPlots(section) {
+  const plots = section.querySelectorAll(".plot");
+  const resize = () => {
+    plots.forEach((el) => {
+      if (window.Plotly && window.Plotly.Plots && typeof window.Plotly.Plots.resize === "function") {
+        window.Plotly.Plots.resize(el);
+      }
+    });
+  };
+  requestAnimationFrame(resize);
+  setTimeout(resize, 120);
 }
 
 function initRankingControls() {
@@ -123,10 +165,10 @@ function initRankingControls() {
       RANK_EXPANDED[key] = !RANK_EXPANDED[key];
       const baseTop = key === "topCoffee" ? 10 : 5;
       btn.textContent = RANK_EXPANDED[key] ? `Show Top ${baseTop}` : "Show All";
-      if (!CURRENT_ROWS.length) return;
-      if (key === "topCoffee") renderTopCoffeeRank(CURRENT_ROWS);
-      if (key === "country") renderCountryRankTable(CURRENT_ROWS);
-      if (key === "roaster") renderRoasterRankTable(CURRENT_ROWS);
+      if (!CURRENT_ROWS_ALL.length && !CURRENT_ROWS_ANALYSIS.length) return;
+      if (key === "topCoffee") renderTopCoffeeRank(CURRENT_ROWS_ALL);
+      if (key === "country") renderCountryRankTable(CURRENT_ROWS_ANALYSIS);
+      if (key === "roaster") renderRoasterRankTable(CURRENT_ROWS_ANALYSIS);
     };
   };
   bind("toggleTopCoffeeRank", "topCoffee");
@@ -249,7 +291,9 @@ function toRecord(row) {
   const coffeeName = findValue(row, ["Coffee Name"]);
   const country = canonicalCountry(findValue(row, ["Coffee Origin Country", "Country"]));
   const varietal = canonicalVarietal(findValue(row, ["Varietal", "Variety"]));
-  const process = canonicalProcess(findValue(row, ["Process", "Processing Method", "Processing"]));
+  const processRaw = findValue(row, ["Process", "Processing Method", "Processing"]);
+  const process = canonicalProcess(processRaw);
+  const decafRaw = findValue(row, ["Decaf", "Is Decaf", "Decaf?"]);
   const alexRating = toNumber(findValue(row, ["Alex Rating"]));
   const rebRating = toNumber(findValue(row, ["Rebby Rating", "Rebecca Rating", "Reb Rating"]));
 
@@ -268,7 +312,7 @@ function toRecord(row) {
     country,
     varietal,
     process,
-    isDecaf: isDecafProcess(process),
+    isDecaf: isTruthyDecaf(decafRaw) || isDecafProcess(processRaw) || isDecafProcess(process),
     alexRating,
     rebRating,
     avgRating,
@@ -285,6 +329,9 @@ function toRecord(row) {
 }
 
 function renderTopCoffeeRank(rows) {
+  const subtitle = document.getElementById("topCoffeeSubtitle");
+  if (subtitle) subtitle.textContent = `Ranked by overall rating (N = ${rows.length})`;
+
   const ranked = rows
     .filter((r) => r.avgRating !== null)
     .map((r) => ({
@@ -321,6 +368,45 @@ function renderTopCoffeeRank(rows) {
   if (target) target.innerHTML = tableHtml;
 }
 
+function renderDecafRank(rows) {
+  const ranked = rows
+    .filter((r) => r.avgRating !== null && r.isDecaf)
+    .map((r) => ({
+      roaster: toDisplayCase(r.roaster || "Unknown Roaster"),
+      roasterLocation: toDisplayCase(r.roasterLocation || "Unknown Location"),
+      coffeeName: coffeeNameWithDecaf(r.coffeeName || "(Unnamed Coffee)", true),
+      country: toDisplayCase(r.country || "Unknown Origin"),
+      process: r.process || "",
+      avg: r.avgRating
+    }))
+    .sort((a, b) => b.avg - a.avg);
+
+  const target = document.getElementById("decafRankTable");
+  if (!target) return;
+  if (!ranked.length) {
+    target.innerHTML = "<p>No decaf coffees found yet.</p>";
+    return;
+  }
+
+  const tableHtml = [
+    "<table>",
+    "<thead><tr><th class=\"rank-col\">#</th><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Coffee Origin</th><th>Process</th><th>Overall Rating</th></tr></thead>",
+    "<tbody>",
+    ...ranked.map((r, idx) =>
+      `<tr><td class="rank-col">${idx + 1}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(r.roaster)}</td><td style="color:${ratingColor(r.avg)};">${escapeHtml(
+        r.coffeeName
+      )}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(
+        r.country
+      )}</td><td>${escapeHtml(r.process)}</td><td class="avg-rating-cell">${formatRatingHtml(
+        r.avg,
+        2
+      )}</td></tr>`
+    ),
+    "</tbody></table>"
+  ].join("");
+  target.innerHTML = tableHtml;
+}
+
 function renderTasterTop5(rows, who) {
   const isAlex = who === "alex";
   const targetId = isAlex ? "alexTop5Table" : "rebTop5Table";
@@ -338,9 +424,9 @@ function renderTasterTop5(rows, who) {
 
   const html = [
     "<table>",
-    "<thead><tr><th>Name</th><th>Roaster</th><th>Roaster Location</th><th>Origin</th><th>Rating</th></tr></thead>",
+    "<thead><tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Origin</th><th>Rating</th></tr></thead>",
     "<tbody>",
-    ...rankedRows.map((r) => `<tr><td>${escapeHtml(r.coffeeName)}</td><td>${escapeHtml(r.roaster)}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(r.country)}</td><td>${formatRatingHtml(r.rating, 2)}</td></tr>`),
+    ...rankedRows.map((r) => `<tr><td>${escapeHtml(r.roaster)}</td><td>${escapeHtml(r.coffeeName)}</td><td>${escapeHtml(r.roasterLocation)}</td><td>${escapeHtml(r.country)}</td><td>${formatRatingHtml(r.rating, 2)}</td></tr>`),
     "</tbody></table>"
   ].join("");
 
@@ -632,22 +718,25 @@ function renderRoasterCountryMap(grouped) {
 function renderRoasterRegionDetails(rows, title) {
   const target = document.getElementById("roasterRegionDetails");
   if (!target) return;
-  if (!rows.length) {
-    target.innerHTML = `<p>${escapeHtml(title)}</p>`;
+  const filtered = rows.filter((r) => !r.isDecaf);
+  if (!filtered.length) {
+    target.innerHTML = `<p class="table-placeholder">${escapeHtml(title)}</p>`;
     return;
   }
-  const sorted = [...rows].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0)).slice(0, 30);
+  const sorted = [...filtered].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0)).slice(0, 30);
   const html = [
-    `<table><thead><tr><th colspan=\"7\">${escapeHtml(title)} (${rows.length} coffees)</th></tr>`,
-    "<tr><th>Name</th><th>Roaster</th><th>Roaster Location</th><th>Origin</th><th>Alex</th><th>Rebecca</th><th>Avg</th></tr></thead>",
+    `<table><thead><tr><th colspan=\"7\">${escapeHtml(title)} (${filtered.length} coffees)</th></tr>`,
+    "<tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Origin</th><th>Alex</th><th>Rebecca</th><th>Avg</th></tr></thead>",
     "<tbody>",
     ...sorted.map(
       (r) =>
-        `<tr><td>${escapeHtml(coffeeNameWithDecaf(r.coffeeName || "", r.isDecaf))}</td><td>${escapeHtml(toDisplayCase(
+        `<tr><td>${escapeHtml(toDisplayCase(
           r.roaster || ""
-        ))}</td><td>${escapeHtml(r.roasterLocation || "")}</td><td>${escapeHtml(r.country || "")}</td><td>${
+        ))}</td><td>${escapeHtml(toDisplayCase(r.coffeeName || ""))}</td><td>${escapeHtml(
+          r.roasterLocation || ""
+        )}</td><td>${escapeHtml(r.country || "")}</td><td>${
           r.alexRating === null ? "" : formatRatingHtml(r.alexRating, 1)
-        }</td><td>${r.rebRating === null ? "" : formatRatingHtml(r.rebRating, 1)}</td><td>${
+        }</td><td>${r.rebRating === null ? "" : formatRatingHtml(r.rebRating, 1)}</td><td class="avg-rating-cell">${
           r.avgRating === null ? "" : formatRatingHtml(r.avgRating, 2)
         }</td></tr>`
     ),
@@ -734,7 +823,7 @@ function renderCountryRankTable(rows) {
     .map(([country, bucket]) => {
       const bestCoffee = [...bucket.coffees.values()]
         .map((c) => ({
-          name: `${coffeeNameWithDecaf(c.coffeeName, c.hasDecaf)} - ${toDisplayCase(c.roaster)}`,
+          name: `${toDisplayCase(c.roaster)} - ${coffeeNameWithDecaf(c.coffeeName, c.hasDecaf)}`,
           avg: c.sum / c.count
         }))
         .sort((a, b) => b.avg - a.avg)[0];
@@ -816,7 +905,7 @@ function renderRoasterRankTable(rows) {
     .map(([location, b]) => {
       const bestCoffee = [...b.coffees.values()]
         .map((c) => ({
-          name: `${coffeeNameWithDecaf(c.coffeeName, c.hasDecaf)} - ${toDisplayCase(c.roaster)}`,
+          name: `${toDisplayCase(c.roaster)} - ${coffeeNameWithDecaf(c.coffeeName, c.hasDecaf)}`,
           avg: c.sum / c.count
         }))
         .sort((a, b2) => b2.avg - a.avg)[0];
@@ -847,24 +936,27 @@ function renderRoasterRankTable(rows) {
 function renderOriginRegionDetails(rows, title) {
   const target = document.getElementById("originRegionDetails");
   if (!target) return;
-  if (!rows.length) {
-    target.innerHTML = `<p>${escapeHtml(title)}</p>`;
+  const filtered = rows.filter((r) => !r.isDecaf);
+  if (!filtered.length) {
+    target.innerHTML = `<p class="table-placeholder">${escapeHtml(title)}</p>`;
     return;
   }
-  const sorted = [...rows].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0)).slice(0, 40);
+  const sorted = [...filtered].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0)).slice(0, 40);
   const html = [
-    `<table><thead><tr><th colspan=\"8\">${escapeHtml(title)} (${rows.length} coffees)</th></tr>`,
-    "<tr><th>Name</th><th>Roaster</th><th>Roaster Location</th><th>Process</th><th>Varietal</th><th>Alex</th><th>Rebecca</th><th>Avg</th></tr></thead>",
+    `<table><thead><tr><th colspan=\"8\">${escapeHtml(title)} (${filtered.length} coffees)</th></tr>`,
+    "<tr><th>Roaster</th><th>Name</th><th>Roaster Location</th><th>Process</th><th>Varietal</th><th>Alex</th><th>Rebecca</th><th>Avg</th></tr></thead>",
     "<tbody>",
     ...sorted.map(
       (r) =>
-        `<tr><td>${escapeHtml(coffeeNameWithDecaf(r.coffeeName || "", r.isDecaf))}</td><td>${escapeHtml(toDisplayCase(
+        `<tr><td>${escapeHtml(toDisplayCase(
           r.roaster || ""
-        ))}</td><td>${escapeHtml(r.roasterLocation || "")}</td><td>${escapeHtml(r.process || "")}</td><td>${escapeHtml(
+        ))}</td><td>${escapeHtml(toDisplayCase(r.coffeeName || ""))}</td><td>${escapeHtml(
+          r.roasterLocation || ""
+        )}</td><td>${escapeHtml(r.process || "")}</td><td>${escapeHtml(
           r.varietal || ""
         )}</td><td>${r.alexRating === null ? "" : formatRatingHtml(r.alexRating, 1)}</td><td>${
           r.rebRating === null ? "" : formatRatingHtml(r.rebRating, 1)
-        }</td><td>${r.avgRating === null ? "" : formatRatingHtml(r.avgRating, 2)}</td></tr>`
+        }</td><td class="avg-rating-cell">${r.avgRating === null ? "" : formatRatingHtml(r.avgRating, 2)}</td></tr>`
     ),
     "</tbody></table>"
   ].join("");
@@ -1020,8 +1112,8 @@ function renderRatingWordSpectrum(rows) {
   const target = document.getElementById("ratingWordSpectrumChart");
   if (!target) return;
 
-  const alexPoints = buildRatingWordPoints(rows, "alexRating", "alexText", true);
-  const rebPoints = buildRatingWordPoints(rows, "rebRating", "rebText", false);
+  const alexPoints = buildVerticalWordPoints(rows, "alexRating", "alexText", "alex");
+  const rebPoints = buildVerticalWordPoints(rows, "rebRating", "rebText", "rebecca");
 
   if (!alexPoints.length && !rebPoints.length) {
     target.innerHTML = "<p>Not enough tasting-note words tied to ratings yet.</p>";
@@ -1040,10 +1132,10 @@ function renderRatingWordSpectrum(rows) {
       text: alexPoints.map((p) => p.label),
       textfont: {
         size: alexPoints.map((p) => p.size),
-        color: alexPoints.map((p) => p.color)
+        color: COLOR_ORANGE
       },
-      customdata: alexPoints.map((p) => [p.bucket, p.count, p.word]),
-      hovertemplate: "Alex: %{customdata[2]}<br>Rating bucket: %{customdata[0]}<br>Count: %{customdata[1]}<extra></extra>"
+      customdata: alexPoints.map((p) => [p.rating, p.count, p.word]),
+      hovertemplate: "Alex: %{customdata[2]}<br>Rating: %{customdata[0]}<br>Count: %{customdata[1]}<extra></extra>"
     });
   }
 
@@ -1058,10 +1150,10 @@ function renderRatingWordSpectrum(rows) {
       text: rebPoints.map((p) => p.label),
       textfont: {
         size: rebPoints.map((p) => p.size),
-        color: rebPoints.map((p) => p.color)
+        color: COLOR_GREEN
       },
-      customdata: rebPoints.map((p) => [p.bucket, p.count, p.word]),
-      hovertemplate: "Rebecca: %{customdata[2]}<br>Rating bucket: %{customdata[0]}<br>Count: %{customdata[1]}<extra></extra>"
+      customdata: rebPoints.map((p) => [p.rating, p.count, p.word]),
+      hovertemplate: "Rebecca: %{customdata[2]}<br>Rating: %{customdata[0]}<br>Count: %{customdata[1]}<extra></extra>"
     });
   }
 
@@ -1069,28 +1161,27 @@ function renderRatingWordSpectrum(rows) {
     "ratingWordSpectrumChart",
     traces,
     {
-      margin: { t: 10, r: 20, b: 45, l: 20 },
+      height: 760,
+      margin: { t: 10, r: 25, b: 45, l: 25 },
       xaxis: {
-        title: "Rating Band",
-        range: [0.5, 3.5],
-        tickmode: "array",
-        tickvals: [1, 2, 3],
-        ticktext: ["0-4", "5-7", "8-10"],
-        showgrid: true,
-        gridcolor: "#e6ebf1"
-      },
-      yaxis: {
-        range: [-2.25, 2.25],
+        range: [-2.75, 2.75],
         showticklabels: false,
-        showgrid: false,
         zeroline: true,
         zerolinecolor: "#c8d3e0",
-        zerolinewidth: 2
+        zerolinewidth: 2,
+        showgrid: true,
+        gridcolor: "#edf1f5"
       },
-      annotations: [
-        { x: 2.05, y: 1.95, text: "Alex", showarrow: false, font: { color: COLOR_ORANGE, size: 12 } },
-        { x: 2.05, y: -1.95, text: "Rebecca", showarrow: false, font: { color: COLOR_GREEN, size: 12 } }
-      ],
+      yaxis: {
+        title: "Rating",
+        range: [-0.5, 10.5],
+        tickmode: "linear",
+        tick0: 0,
+        dtick: 1,
+        showgrid: true,
+        gridcolor: "#e6ebf1",
+        zeroline: false
+      },
       showlegend: false,
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)"
@@ -1099,49 +1190,46 @@ function renderRatingWordSpectrum(rows) {
   );
 }
 
-function buildRatingWordPoints(rows, ratingKey, textKey, isTop) {
-  const bands = [
-    { label: "0-4", min: 0, max: 4, x: 1 },
-    { label: "5-7", min: 5, max: 7, x: 2 },
-    { label: "8-10", min: 8, max: 10, x: 3 }
-  ];
-  const byBucket = new Map();
-  for (const band of bands) byBucket.set(band.label, new Map());
+function buildVerticalWordPoints(rows, ratingKey, textKey, side) {
+  const byRating = new Map();
+  for (let step = 0; step <= 20; step++) {
+    const rating = step / 2;
+    byRating.set(rating, new Map());
+  }
 
   for (const row of rows) {
-    const rating = row[ratingKey];
-    if (rating === null || rating === undefined || Number.isNaN(rating)) continue;
-    const band = ratingBand(rating);
-    if (!band) continue;
+    const rating = ratingBucketHalf(row[ratingKey]);
+    if (rating === null) continue;
     const terms = extractCommaNoteItems(row[textKey] || "");
     if (!terms.length) continue;
-    const map = byBucket.get(band.label);
+    const map = byRating.get(rating);
     for (const term of terms) {
       map.set(term, (map.get(term) || 0) + 1);
     }
   }
 
-  const points = [];
-  for (const band of bands) {
-    const entries = [...byBucket.get(band.label).entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4);
-    if (!entries.length) continue;
+  const direction = side === "alex" ? -1 : 1;
 
-    const yBase = isTop ? 0.55 : -0.55;
-    const direction = isTop ? 1 : -1;
-    const color = ratingColorFixed((band.min + band.max) / 2);
-    const xOffsets = [-0.32, -0.1, 0.12, 0.34];
+  const points = [];
+  for (let step = 20; step >= 0; step--) {
+    const rating = step / 2;
+    const entries = [...byRating.get(rating).entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
     entries.forEach(([word, count], idx) => {
+      const seed = seededUnit(`${side}|${rating}|${word}`);
+      const seedY = seededUnit(`${word}|${rating}|${side}|y`);
+      const xBase = 0.45 + seed * 1.9 + (idx % 3) * 0.08;
+      const yJitter = (seedY - 0.5) * 1.05;
       points.push({
-        x: band.x + (xOffsets[idx] || 0),
-        y: yBase + direction * idx * 0.34,
+        x: direction * Math.min(2.55, xBase),
+        y: Math.max(0, Math.min(10, rating + yJitter)),
         word,
-        label: trimWordLabel(word, 22),
+        label: trimWordLabel(word, 24),
         count,
-        bucket: band.label,
-        color,
-        size: 10 + Math.min(12, count * 1.4)
+        rating,
+        size: 11 + Math.min(26, Math.round(Math.pow(count, 0.88) * 3.3))
       });
     });
   }
@@ -1178,12 +1266,21 @@ function extractCommaNoteItems(text) {
   return items;
 }
 
-function ratingBand(value) {
+function ratingBucketHalf(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  if (n <= 4) return { label: "0-4", min: 0, max: 4, x: 1 };
-  if (n <= 7) return { label: "5-7", min: 5, max: 7, x: 2 };
-  return { label: "8-10", min: 8, max: 10, x: 3 };
+  // Use finer buckets from actual ratings and avoid upward pull to 10 unless truly present.
+  return Math.max(0, Math.min(10, Math.floor(n * 2) / 2));
+}
+
+function seededUnit(input) {
+  let h = 2166136261;
+  const text = String(input || "");
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
 }
 
 function ratingColorFixed(value) {
@@ -1625,6 +1722,12 @@ function rgbToHex({ r, g, b }) {
 
 function isDecafProcess(process) {
   return /\bdecaf\b/i.test(String(process || ""));
+}
+
+function isTruthyDecaf(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (!v) return false;
+  return v === "y" || v === "yes" || v === "true" || v === "1" || v === "decaf";
 }
 
 function coffeeNameWithDecaf(name, hasDecaf) {

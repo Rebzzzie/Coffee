@@ -65,6 +65,10 @@ main {
   font-size: 0.92rem;
 }
 
+.rankings-spacer {
+  margin-top: 1.1rem;
+}
+
 .group-title {
   margin: 0.6rem 0 0.1rem;
   padding: 0 0.1rem;
@@ -74,10 +78,54 @@ main {
   color: #47515a;
 }
 
+.collapsible-section {
+  border: 1px solid #d8dde4;
+  border-radius: 12px;
+  background: #f8f9fb;
+  overflow: hidden;
+}
+
+.collapsible-toggle {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: #f2f4f7;
+  color: #3e4a57;
+  font-weight: 700;
+  font-size: 1.06rem;
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #dde3ea;
+}
+
+.collapsible-toggle::after {
+  content: "+";
+  float: right;
+  font-weight: 700;
+}
+
+.collapsible-section.open .collapsible-toggle::after {
+  content: "-";
+}
+
+.collapsible-content {
+  display: none;
+  padding: 1rem 1rem 1.1rem;
+  gap: 1.1rem;
+}
+
+.collapsible-section.open .collapsible-content {
+  display: grid;
+}
+
 .grid-2 {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stack-vertical {
+  grid-template-columns: 1fr;
 }
 
 .grid-3 {
@@ -139,6 +187,25 @@ main {
   color: #cfe0f4;
 }
 
+.decaf-coffee-card {
+  background: #dce8f7;
+  border-color: #bfd2ea;
+  border-width: 2px;
+}
+
+.decaf-coffee-card .table-scroll {
+  background: #ffffff;
+  border-color: #bfd2ea;
+}
+
+.decaf-coffee-card .section-header h2 {
+  color: #2f4f73;
+}
+
+.decaf-coffee-card .section-header p {
+  color: #4a6a8f;
+}
+
 .mini-btn {
   margin-top: 0.6rem;
   border: 1px solid #d4dbe4;
@@ -183,6 +250,23 @@ main {
   font-size: 0.92rem;
 }
 
+.table-placeholder {
+  margin: 0.8rem;
+  text-align: center;
+  color: #8f9cac;
+  font-size: 0.92rem;
+}
+
+.spectrum-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.2rem 0.25rem 0.25rem;
+  color: #5b6572;
+  font-weight: 700;
+  font-size: 1.08rem;
+}
+
 .avg-rating-cell {
   background: #f1f3f5;
   box-shadow: inset 0 0 0 1px #dde2e7;
@@ -194,33 +278,109 @@ main {
 }
 
 #topCoffeeRankTable th:last-child,
-#topCoffeeRankTable td:last-child {
+#topCoffeeRankTable td:last-child,
+#decafRankTable th:last-child,
+#decafRankTable td:last-child {
   text-align: center !important;
 }
 
-#topCoffeeRankTable .rank-col {
+#topCoffeeRankTable .rank-col,
+#decafRankTable .rank-col {
   width: 2.8rem;
   text-align: center !important;
   color: #6b7683;
 }
 
 #topCoffeeRankTable tbody td:nth-child(2),
-#topCoffeeRankTable tbody td:nth-child(3) {
+#topCoffeeRankTable tbody td:nth-child(3),
+#decafRankTable tbody td:nth-child(2),
+#decafRankTable tbody td:nth-child(3) {
   font-weight: 700;
 }
 
 #topCoffeeRankTable th:not(:last-child),
-#topCoffeeRankTable td:not(:last-child) {
+#topCoffeeRankTable td:not(:last-child),
+#decafRankTable th:not(:last-child),
+#decafRankTable td:not(:last-child) {
   border-right: 1px solid #e7edf4;
 }
 
-#topCoffeeRankTable thead th {
+#topCoffeeRankTable thead th,
+#decafRankTable thead th {
   background: #eef3f9;
   color: #3f4f61;
   font-weight: 700;
   padding-top: 0.8rem;
   padding-bottom: 0.8rem;
   border-bottom: 2px solid #d6e1ee;
+}
+
+#originRegionDetails th:not(:last-child),
+#originRegionDetails td:not(:last-child),
+#roasterRegionDetails th:not(:last-child),
+#roasterRegionDetails td:not(:last-child) {
+  border-right: 1px solid #e7edf4;
+}
+
+#originRegionDetails thead th,
+#roasterRegionDetails thead th {
+  background: #eef1f4;
+  color: #4a5563;
+  font-weight: 700;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 2px solid #d7dee6;
+}
+
+#originRegionDetails td,
+#roasterRegionDetails td {
+  border-bottom: 1px solid #dde6f0;
+}
+
+#countryRankTable thead th {
+  background: #dfeaf8;
+  color: #2f4f73;
+  font-weight: 700;
+  border-bottom: 2px solid #bfd2ea;
+}
+
+#countryRankTable th:not(:last-child),
+#countryRankTable td:not(:last-child) {
+  border-right: 1px solid #e7edf4;
+}
+
+#countryRankTable td {
+  border-bottom: 1px solid #dde6f0;
+}
+
+#roasterRankTable thead th {
+  background: #dfeaf8;
+  color: #2f4f73;
+  font-weight: 700;
+  border-bottom: 2px solid #bfd2ea;
+}
+
+#roasterRankTable th:not(:last-child),
+#roasterRankTable td:not(:last-child) {
+  border-right: 1px solid #e7edf4;
+}
+
+#roasterRankTable td {
+  border-bottom: 1px solid #dde6f0;
+}
+
+#originRegionDetails tbody td:nth-child(1),
+#originRegionDetails tbody td:nth-child(2),
+#roasterRegionDetails tbody td:nth-child(1),
+#roasterRegionDetails tbody td:nth-child(2) {
+  font-weight: 700;
+}
+
+#originRegionDetails th:last-child,
+#originRegionDetails td:last-child,
+#roasterRegionDetails th:last-child,
+#roasterRegionDetails td:last-child {
+  text-align: center !important;
 }
 
 .rating-value {
